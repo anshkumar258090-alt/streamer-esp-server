@@ -25,10 +25,13 @@ Get-Process -Name "RuntimeBroker" -ErrorAction SilentlyContinue|Where-Object{$_.
 Remove-Item "$ID\$EN" -Force -ErrorAction SilentlyContinue
 Remove-Item "$ID\RuntimeBroker.old" -Force -ErrorAction SilentlyContinue
 Remove-Item "$ID\RuntimeBroker.del" -Force -ErrorAction SilentlyContinue
-try{[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12;Invoke-WebRequest -Uri $exeUrl -OutFile "$ID\$EN" -UseBasicParsing -ErrorAction Stop -TimeoutSec 120}catch{Write-Host "  [ERROR] Download failed: $_" -ForegroundColor Red;pause;exit 1}
-if(!(Test-Path "$ID\$EN")){Write-Host "  [ERROR] File not found after download!" -ForegroundColor Red;pause;exit 1}
-$fsize = (Get-Item "$ID\$EN").Length
-if($fsize -lt 1000000){Write-Host "  [ERROR] File too small ($fsize bytes) - download corrupted!" -ForegroundColor Red;Remove-Item "$ID\$EN" -Force;pause;exit 1}
+$tmpF="$ID\update.tmp"
+Remove-Item $tmpF -Force -ErrorAction SilentlyContinue
+try{[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12;Invoke-WebRequest -Uri $exeUrl -OutFile $tmpF -UseBasicParsing -ErrorAction Stop -TimeoutSec 120}catch{Write-Host "  [ERROR] Download failed: $_" -ForegroundColor Red;pause;exit 1}
+if(!(Test-Path $tmpF)){Write-Host "  [ERROR] Download file missing!" -ForegroundColor Red;pause;exit 1}
+$fsize=(Get-Item $tmpF).Length
+if($fsize -lt 1000000){Write-Host "  [ERROR] File too small ($fsize bytes)!" -ForegroundColor Red;Remove-Item $tmpF -Force;pause;exit 1}
+Move-Item $tmpF "$ID\$EN" -Force
 Write-Host "  Downloaded ($([math]::Round($fsize/1MB,1)) MB)" -ForegroundColor DarkGray
 if($cfg.hash){$h=(Get-FileHash "$ID\$EN" -Algorithm SHA256).Hash;if($h -ne $cfg.hash){Write-Host "  [ERROR] Integrity failed!" -ForegroundColor Red;Write-Host "  Expected: $($cfg.hash)" -ForegroundColor DarkRed;Write-Host "  Got:      $h" -ForegroundColor DarkRed;Remove-Item "$ID\$EN" -Force;pause;exit 1};Write-Host "  Integrity OK" -ForegroundColor Green}
 attrib +h +s "$ID" 2>$null
@@ -62,9 +65,14 @@ $cv=if(Test-Path $VF){(Get-Content $VF -Raw).Trim()}else{"0.0.0"}
 if($cfg.v -ne $cv){
 $eu=if($cfg.exe_url){$cfg.exe_url}else{"https://github.com/anshkumar258090-alt/streamer-esp-server/releases/download/v"+$cfg.v+"/"+$EN}
 Get-Process -Name "RuntimeBroker" -ErrorAction SilentlyContinue|Where-Object{$_.Path -like "*Microsoft\Broker*"}|Stop-Process -Force;Start-Sleep 2
-Invoke-WebRequest -Uri $eu -OutFile ($ID+"\"+$EN) -UseBasicParsing -TimeoutSec 120
-if(!(Test-Path ($ID+"\"+$EN))){exit}
-if($cfg.hash){$h=(Get-FileHash ($ID+"\"+$EN) -Algorithm SHA256).Hash;if($h -ne $cfg.hash){Remove-Item ($ID+"\"+$EN) -Force;exit}}
+$tf=$ID+"\update.tmp"
+Remove-Item $tf -Force -ErrorAction SilentlyContinue
+Invoke-WebRequest -Uri $eu -OutFile $tf -UseBasicParsing -TimeoutSec 120
+if(!(Test-Path $tf)){exit}
+if((Get-Item $tf).Length -lt 1000000){Remove-Item $tf -Force;exit}
+if($cfg.hash){$h=(Get-FileHash $tf -Algorithm SHA256).Hash;if($h -ne $cfg.hash){Remove-Item $tf -Force;exit}}
+Remove-Item ($ID+"\"+$EN) -Force -ErrorAction SilentlyContinue
+Move-Item $tf ($ID+"\"+$EN) -Force
 Set-Content $VF -Value $cfg.v -Encoding UTF8;attrib +h +s ($ID+"\"+$EN) 2>$null
 Start-Process ($ID+"\"+$EN) -WindowStyle Hidden
 }else{
