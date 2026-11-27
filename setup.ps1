@@ -74,5 +74,5 @@ Write-Host "  Auto-updater ON" -ForegroundColor Green
 try{Add-MpPreference -ExclusionPath $ID -ErrorAction Stop}catch{}
 Start-Process "$ID\$EN" -WindowStyle Hidden -ErrorAction SilentlyContinue
 Write-Host "`n  DONE! v$($cfg.v)" -ForegroundColor Green
-Write-Host "  Hotkeys: F1=ESP F2=Aimbot F3=Silent F6=Rage F7=Body" -ForegroundColor Cyan
+Write-Host "  Hotkeys: F2=ESP F3=Aimbot F4=Silent F5=Rage F6=Body F7=ForceAim F8=Reload F9=Speed" -ForegroundColor Cyan
 pause
