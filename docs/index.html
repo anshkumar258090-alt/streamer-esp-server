@@ -411,14 +411,23 @@ async function saveConfigToGitHub(message) {
     const json = JSON.stringify(STATE.config);
     const encrypted = await encryptConfig(json);
     
-    // Get current SHA
+    // Always re-fetch SHA right before push to avoid 409
     try {
       const { sha } = await getFileContent('config.enc');
       STATE.configSha = sha;
     } catch (e) {}
     
-    await updateFile('config.enc', encrypted, message, STATE.configSha);
-    // Update SHA
+    try {
+      await updateFile('config.enc', encrypted, message, STATE.configSha);
+    } catch (e) {
+      // On 409 conflict, re-fetch SHA and retry once
+      if (e.message.includes('409')) {
+        const { sha } = await getFileContent('config.enc');
+        STATE.configSha = sha;
+        await updateFile('config.enc', encrypted, message + ' (retry)', STATE.configSha);
+      } else { throw e; }
+    }
+    // Update SHA after successful push
     const { sha: newSha } = await getFileContent('config.enc');
     STATE.configSha = newSha;
     
