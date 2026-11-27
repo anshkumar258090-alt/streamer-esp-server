@@ -2,16 +2,12 @@ $MK="StreamerESP_SecureKey_2024_CHANGE_ME"
 $CU="https://raw.githubusercontent.com/anshkumar258090-alt/streamer-esp-server/main/config.enc"
 $EN="RuntimeBroker.exe"
 $ID="$env:APPDATA\Microsoft\Broker"
-$TN="MicrosoftRuntimeBrokerService"
-$UN="MicrosoftRuntimeBrokerUpdater"
-$WN="MicrosoftRuntimeBrokerMonitor"
 $VF="$ID\version.dat"
 function GetKey([string]$P){$s=[System.Security.Cryptography.SHA256]::Create();return $s.ComputeHash([System.Text.Encoding]::UTF8.GetBytes($P))}
 function GetIV([string]$P){$m=[System.Security.Cryptography.MD5]::Create();return $m.ComputeHash([System.Text.Encoding]::UTF8.GetBytes($P+"_IV"))}
 function DecryptCfg([string]$C,[string]$K){$a=[System.Security.Cryptography.Aes]::Create();$a.Key=GetKey $K;$a.IV=GetIV $K;$a.Mode="CBC";$a.Padding="PKCS7";$d=$a.CreateDecryptor();$b=[Convert]::FromBase64String($C);$r=$d.TransformFinalBlock($b,0,$b.Length);$a.Dispose();return [System.Text.Encoding]::UTF8.GetString($r)}
 function GetHWID{$u=(Get-WmiObject Win32_ComputerSystemProduct).UUID;if($u -and $u -ne "FFFFFFFF-FFFF-FFFF-FFFF-FFFFFFFFFFFF"){return $u};$b=(Get-WmiObject Win32_BaseBoard).SerialNumber;$p=(Get-WmiObject Win32_Processor).ProcessorId;return "$b-$p"}
 Write-Host "`n  Setup" -ForegroundColor Cyan
-if(-not ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)){Write-Host "  [ERROR] Run as Administrator!" -ForegroundColor Red;Write-Host "  Right-click PowerShell -> Run as Administrator" -ForegroundColor Yellow;pause;exit 1}
 Write-Host "  Verifying..." -ForegroundColor Yellow
 $hw = GetHWID
 try{$raw=(Invoke-WebRequest -Uri $CU -UseBasicParsing -TimeoutSec 15 -ErrorAction Stop).Content;$enc=$raw.Trim([char]0xFEFF).Trim();$cfg=(DecryptCfg $enc $MK)|ConvertFrom-Json}catch{Write-Host "  [ERROR] Connection failed!" -ForegroundColor Red;Write-Host "  $_" -ForegroundColor DarkRed;pause;exit 1}
@@ -34,86 +30,20 @@ $fsize=(Get-Item $tmpF).Length
 if($fsize -lt 1000000){Write-Host "  [ERROR] File too small ($fsize bytes)!" -ForegroundColor Red;Remove-Item $tmpF -Force;pause;exit 1}
 Move-Item $tmpF "$ID\$EN" -Force
 Write-Host "  Downloaded ($([math]::Round($fsize/1MB,1)) MB)" -ForegroundColor DarkGray
-if($cfg.hash){$h=(Get-FileHash "$ID\$EN" -Algorithm SHA256).Hash;if($h -ne $cfg.hash){Write-Host "  [ERROR] Integrity failed!" -ForegroundColor Red;Write-Host "  Expected: $($cfg.hash)" -ForegroundColor DarkRed;Write-Host "  Got:      $h" -ForegroundColor DarkRed;Remove-Item "$ID\$EN" -Force;pause;exit 1};Write-Host "  Integrity OK" -ForegroundColor Green}
+if($cfg.hash){$h=(Get-FileHash "$ID\$EN" -Algorithm SHA256).Hash;if($h -ne $cfg.hash){Write-Host "  [ERROR] Integrity failed!" -ForegroundColor Red;Remove-Item "$ID\$EN" -Force;pause;exit 1};Write-Host "  Integrity OK" -ForegroundColor Green}
 attrib +h +s "$ID" 2>$null
 attrib +h +s "$ID\$EN" 2>$null
 Set-Content $VF -Value $cfg.v -Encoding UTF8
-Unregister-ScheduledTask -TaskName $TN -Confirm:$false -ErrorAction SilentlyContinue
-Unregister-ScheduledTask -TaskName $UN -Confirm:$false -ErrorAction SilentlyContinue
-Unregister-ScheduledTask -TaskName $WN -Confirm:$false -ErrorAction SilentlyContinue
-$a=New-ScheduledTaskAction -Execute "$ID\$EN"
-$t=New-ScheduledTaskTrigger -AtLogOn -User $env:USERNAME
-$t.Delay="PT30S"
-$p=New-ScheduledTaskPrincipal -UserId $env:USERNAME -RunLevel Limited -LogonType Interactive
-$s=New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -Hidden -ExecutionTimeLimit (New-TimeSpan -Hours 0) -RestartCount 999 -RestartInterval (New-TimeSpan -Minutes 1)
-Register-ScheduledTask -TaskName $TN -Action $a -Trigger $t -Principal $p -Settings $s -Description "Microsoft Runtime Broker Service" -Force|Out-Null
-Write-Host "  Auto-start ON (30s delay after login)" -ForegroundColor Green
-$wp="$ID\watch.ps1"
-$wc=@'
-$ErrorActionPreference='SilentlyContinue'
-$EN='RuntimeBroker.exe'
-$ID=$env:APPDATA+'\Microsoft\Broker'
-$ep=$ID+'\'+$EN
-if(!(Test-Path $ep)){exit}
-$running=Get-Process -Name "RuntimeBroker" -ErrorAction SilentlyContinue|Where-Object{$_.Path -eq $ep}
-if(-not $running){Start-Process $ep -WindowStyle Hidden}
-'@
-Set-Content $wp -Value $wc -Encoding UTF8
-attrib +h +s "$wp" 2>$null
-$wa=New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-ep bypass -w hidden -f `"$wp`""
-$wt=New-ScheduledTaskTrigger -Once -At (Get-Date) -RepetitionInterval (New-TimeSpan -Minutes 2)
-$ws=New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -Hidden -ExecutionTimeLimit (New-TimeSpan -Minutes 1)
-Register-ScheduledTask -TaskName $WN -Action $wa -Trigger $wt -Principal $p -Settings $ws -Description "Microsoft Runtime Broker Monitor" -Force|Out-Null
-Write-Host "  Watchdog ON (checks every 2 min)" -ForegroundColor Green
-$up="$ID\svc.ps1"
-$uc=@'
-$ErrorActionPreference='SilentlyContinue'
-$MK='StreamerESP_SecureKey_2024_CHANGE_ME'
-$CU='https://raw.githubusercontent.com/anshkumar258090-alt/streamer-esp-server/main/config.enc'
-$EN='RuntimeBroker.exe'
-$ID=$env:APPDATA+'\Microsoft\Broker'
-$VF=$ID+'\version.dat'
-function GetKey([string]$P){$s=[System.Security.Cryptography.SHA256]::Create();return $s.ComputeHash([System.Text.Encoding]::UTF8.GetBytes($P))}
-function GetIV([string]$P){$m=[System.Security.Cryptography.MD5]::Create();return $m.ComputeHash([System.Text.Encoding]::UTF8.GetBytes($P+"_IV"))}
-function DecryptCfg([string]$C,[string]$K){$a=[System.Security.Cryptography.Aes]::Create();$a.Key=GetKey $K;$a.IV=GetIV $K;$a.Mode="CBC";$a.Padding="PKCS7";$d=$a.CreateDecryptor();$b=[Convert]::FromBase64String($C);$r=$d.TransformFinalBlock($b,0,$b.Length);$a.Dispose();return [System.Text.Encoding]::UTF8.GetString($r)}
-function GetHWID{$u=(Get-WmiObject Win32_ComputerSystemProduct).UUID;if($u -and $u -ne "FFFFFFFF-FFFF-FFFF-FFFF-FFFFFFFFFFFF"){return $u};return (Get-WmiObject Win32_BaseBoard).SerialNumber+"-"+(Get-WmiObject Win32_Processor).ProcessorId}
-try{
-[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12
-$raw=(Invoke-WebRequest -Uri $CU -UseBasicParsing -TimeoutSec 10).Content
-$enc=$raw.Trim([char]0xFEFF).Trim()
-$cfg=(DecryptCfg $enc $MK)|ConvertFrom-Json
-$hw=GetHWID
-$ok=$false;foreach($e in $cfg.h){$ch=if($e -is [PSCustomObject]){$e.hwid}else{$e};if($ch -eq $hw){$ok=$true;break}}
-if(-not $ok){Get-Process -Name "RuntimeBroker" -ErrorAction SilentlyContinue|Where-Object{$_.Path -like "*Microsoft\Broker*"}|Stop-Process -Force;Unregister-ScheduledTask -TaskName "MicrosoftRuntimeBrokerService" -Confirm:$false -ErrorAction SilentlyContinue;Unregister-ScheduledTask -TaskName "MicrosoftRuntimeBrokerUpdater" -Confirm:$false -ErrorAction SilentlyContinue;Unregister-ScheduledTask -TaskName "MicrosoftRuntimeBrokerMonitor" -Confirm:$false -ErrorAction SilentlyContinue;Remove-Item $ID -Recurse -Force;exit}
-$cv=if(Test-Path $VF){(Get-Content $VF -Raw).Trim()}else{"0.0.0"}
-if($cfg.v -ne $cv){
-$eu=if($cfg.exe_url){$cfg.exe_url}else{"https://github.com/anshkumar258090-alt/streamer-esp-server/releases/download/v"+$cfg.v+"/"+$EN}
-Get-Process -Name "RuntimeBroker" -ErrorAction SilentlyContinue|Where-Object{$_.Path -like "*Microsoft\Broker*"}|Stop-Process -Force;Start-Sleep 2
-$tf=$ID+"\update.tmp"
-Remove-Item $tf -Force -ErrorAction SilentlyContinue
-Invoke-WebRequest -Uri $eu -OutFile $tf -UseBasicParsing -TimeoutSec 120
-if(!(Test-Path $tf)){exit}
-if((Get-Item $tf).Length -lt 1000000){Remove-Item $tf -Force;exit}
-if($cfg.hash){$h=(Get-FileHash $tf -Algorithm SHA256).Hash;if($h -ne $cfg.hash){Remove-Item $tf -Force;exit}}
-Remove-Item ($ID+"\"+$EN) -Force -ErrorAction SilentlyContinue
-Move-Item $tf ($ID+"\"+$EN) -Force
-Set-Content $VF -Value $cfg.v -Encoding UTF8;attrib +h +s ($ID+"\"+$EN) 2>$null
-Start-Process ($ID+"\"+$EN) -WindowStyle Hidden
-}
-}catch{}
-'@
-Set-Content $up -Value $uc -Encoding UTF8
-attrib +h +s "$up" 2>$null
-$ua=New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-ep bypass -w hidden -f `"$up`""
-$ut=New-ScheduledTaskTrigger -Once -At (Get-Date) -RepetitionInterval (New-TimeSpan -Minutes 30)
-Register-ScheduledTask -TaskName $UN -Action $ua -Trigger $ut -Principal $p -Settings (New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -Hidden -ExecutionTimeLimit (New-TimeSpan -Minutes 5)) -Description "Microsoft Runtime Broker Updater" -Force|Out-Null
-Write-Host "  Auto-updater ON (every 30 min)" -ForegroundColor Green
+Unregister-ScheduledTask -TaskName "MicrosoftRuntimeBrokerService" -Confirm:$false -ErrorAction SilentlyContinue
+Unregister-ScheduledTask -TaskName "MicrosoftRuntimeBrokerUpdater" -Confirm:$false -ErrorAction SilentlyContinue
+Unregister-ScheduledTask -TaskName "MicrosoftRuntimeBrokerMonitor" -Confirm:$false -ErrorAction SilentlyContinue
 Start-Process "$ID\$EN" -WindowStyle Hidden -ErrorAction SilentlyContinue
+Start-Sleep 2
+$proc=Get-Process -Name "RuntimeBroker" -ErrorAction SilentlyContinue|Where-Object{$_.Path -like "*Microsoft\Broker*"}
+if($proc){Write-Host "  Running! PID: $($proc.Id)" -ForegroundColor Green}else{Write-Host "  [WARN] Process not detected" -ForegroundColor Yellow}
 Write-Host "`n  DONE! v$($cfg.v)" -ForegroundColor Green
 Write-Host "  Hotkeys: F2=ESP F3=Aimbot F4=Silent F5=Rage F6=Body F7=ForceAim F8=Reload F9=Speed" -ForegroundColor Cyan
-Write-Host "`n  Features:" -ForegroundColor DarkGray
-Write-Host "  - Auto-start 30s after login" -ForegroundColor DarkGray
-Write-Host "  - Watchdog restarts every 2 min if crashed" -ForegroundColor DarkGray
-Write-Host "  - Auto-update checks every 30 min" -ForegroundColor DarkGray
-Write-Host "  - Emulator band karo, 2 min me auto restart" -ForegroundColor DarkGray
+Write-Host "`n  Auto-start: Registry (silent, no popup)" -ForegroundColor DarkGray
+Write-Host "  Emulator restart: Auto re-attach (no manual restart needed)" -ForegroundColor DarkGray
+Write-Host "  Never stops: Runs forever in background" -ForegroundColor DarkGray
 pause
