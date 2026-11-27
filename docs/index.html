@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>StreamerESP Admin Panel</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0a1a;color:#e0e0e0;font-family:'Segoe UI',system-ui,sans-serif;min-height:100vh}
+.container{max-width:900px;margin:0 auto;padding:20px}
+header{text-align:center;padding:30px 0 20px;border-bottom:1px solid #1a1a3a}
+header h1{font-size:28px;background:linear-gradient(135deg,#00d4ff,#7b2ff7);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:5px}
+header p{color:#888;font-size:13px}
+.status-bar{display:flex;gap:15px;justify-content:center;margin:15px 0;flex-wrap:wrap}
+.status-item{background:#111128;padding:8px 16px;border-radius:8px;font-size:12px;border:1px solid #1a1a3a}
+.status-item span{color:#00d4ff;font-weight:600}
+.card{background:#111128;border:1px solid #1a1a3a;border-radius:12px;padding:20px;margin:20px 0}
+.card h2{font-size:18px;margin-bottom:15px;color:#00d4ff;display:flex;align-items:center;gap:8px}
+.card h2 .icon{font-size:20px}
+.login-section{text-align:center;padding:40px}
+.input-group{margin-bottom:12px;text-align:left}
+.input-group label{display:block;font-size:12px;color:#888;margin-bottom:5px;text-transform:uppercase;letter-spacing:1px}
+input[type="text"],input[type="password"],select{width:100%;padding:10px 14px;background:#0a0a1a;border:1px solid #2a2a4a;border-radius:8px;color:#e0e0e0;font-size:14px;outline:none;transition:.2s}
+input:focus{border-color:#00d4ff;box-shadow:0 0 10px rgba(0,212,255,0.1)}
+.btn{padding:10px 24px;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;transition:.2s;display:inline-flex;align-items:center;gap:6px}
+.btn:hover{transform:translateY(-1px);box-shadow:0 4px 15px rgba(0,0,0,0.3)}
+.btn-primary{background:linear-gradient(135deg,#00d4ff,#7b2ff7);color:#fff}
+.btn-success{background:#00c853;color:#fff}
+.btn-danger{background:#ff1744;color:#fff}
+.btn-warning{background:#ff9100;color:#000}
+.btn-sm{padding:6px 14px;font-size:12px}
+.btn-group{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+table{width:100%;border-collapse:collapse;margin:10px 0}
+th,td{padding:10px 12px;text-align:left;border-bottom:1px solid #1a1a3a;font-size:13px}
+th{color:#888;font-size:11px;text-transform:uppercase;letter-spacing:1px}
+tr:hover{background:#0d0d20}
+.badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600}
+.badge-green{background:#00c85320;color:#00c853;border:1px solid #00c85340}
+.badge-red{background:#ff174420;color:#ff1744;border:1px solid #ff174440}
+.toast{position:fixed;top:20px;right:20px;padding:12px 20px;border-radius:8px;color:#fff;font-size:14px;z-index:9999;animation:slideIn .3s;max-width:400px}
+.toast-success{background:#00c853}
+.toast-error{background:#ff1744}
+.toast-info{background:#2979ff}
+@keyframes slideIn{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}
+.modal-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:999;display:none}
+.modal{background:#111128;border:1px solid #2a2a4a;border-radius:12px;padding:25px;width:90%;max-width:450px}
+.modal h3{margin-bottom:15px;color:#00d4ff}
+.setup-cmd{background:#0a0a1a;padding:12px;border-radius:8px;font-family:'Cascadia Code',monospace;font-size:13px;color:#00d4ff;word-break:break-all;cursor:pointer;border:1px solid #2a2a4a;position:relative;margin:10px 0}
+.setup-cmd:hover{border-color:#00d4ff}
+.setup-cmd::after{content:'📋 Click to copy';position:absolute;right:10px;top:50%;transform:translateY(-50%);font-size:11px;color:#888;font-family:'Segoe UI',sans-serif}
+.version-info{display:flex;gap:20px;flex-wrap:wrap}
+.version-info .stat{flex:1;min-width:120px;background:#0a0a1a;padding:15px;border-radius:8px;text-align:center}
+.version-info .stat .num{font-size:24px;font-weight:700;color:#00d4ff}
+.version-info .stat .lbl{font-size:11px;color:#888;margin-top:3px}
+.hidden{display:none!important}
+.spinner{display:inline-block;width:16px;height:16px;border:2px solid #ffffff40;border-top-color:#fff;border-radius:50%;animation:spin .6s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.tab-bar{display:flex;gap:5px;margin-bottom:20px;border-bottom:1px solid #1a1a3a;padding-bottom:10px}
+.tab{padding:8px 18px;border-radius:8px 8px 0 0;cursor:pointer;font-size:13px;color:#888;transition:.2s;border:1px solid transparent;border-bottom:none}
+.tab:hover{color:#e0e0e0}
+.tab.active{color:#00d4ff;background:#111128;border-color:#1a1a3a}
+.tab-content{display:none}
+.tab-content.active{display:block}
+</style>
+</head>
+<body>
+
+<div class="container">
+  <header>
+    <h1>⚡ StreamerESP Admin Panel</h1>
+    <p>HWID Authentication • Auto-Update • GitHub Integrated</p>
+  </header>
+
+  <!-- LOGIN SECTION -->
+  <div id="loginSection" class="card">
+    <h2><span class="icon">🔐</span> GitHub Authentication</h2>
+    <div class="input-group">
+      <label>GitHub Personal Access Token</label>
+      <input type="password" id="ghToken" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx">
+    </div>
+    <div class="input-group">
+      <label>Repository (owner/repo)</label>
+      <input type="text" id="ghRepo" value="anshkumar258090-alt/streamer-esp-server">
+    </div>
+    <div class="input-group">
+      <label>Master Encryption Key</label>
+      <input type="password" id="masterKey" value="StreamerESP_SecureKey_2024_CHANGE_ME">
+    </div>
+    <div class="btn-group">
+      <button class="btn btn-primary" onclick="doLogin()">🔓 Connect to GitHub</button>
+    </div>
+    <p style="margin-top:12px;font-size:11px;color:#666">
+      Token chahiye: <a href="https://github.com/settings/tokens/new?scopes=repo&description=StreamerESP+Admin" target="_blank" style="color:#00d4ff">GitHub → Settings → Tokens → Generate</a> (repo scope select karo)
+    </p>
+  </div>
+
+  <!-- MAIN PANEL (hidden until login) -->
+  <div id="mainPanel" class="hidden">
+    
+    <div class="status-bar">
+      <div class="status-item">Repo: <span id="repoName">-</span></div>
+      <div class="status-item">Version: <span id="currentVer">-</span></div>
+      <div class="status-item">HWIDs: <span id="hwidCount">-</span></div>
+      <div class="status-item">Updated: <span id="lastUpdated">-</span></div>
+    </div>
+
+    <!-- TABS -->
+    <div class="tab-bar">
+      <div class="tab active" onclick="switchTab('hwids')">👥 HWIDs</div>
+      <div class="tab" onclick="switchTab('update')">🚀 Push Update</div>
+      <div class="tab" onclick="switchTab('client')">📋 Client Setup</div>
+      <div class="tab" onclick="switchTab('tools')">🔧 Tools</div>
+    </div>
+
+    <!-- HWID TAB -->
+    <div id="tab-hwids" class="tab-content active">
+      <div class="card">
+        <h2><span class="icon">👥</span> HWID Management</h2>
+        <div style="display:flex;gap:8px;margin-bottom:15px;flex-wrap:wrap">
+          <input type="text" id="newHwid" placeholder="HWID (UUID format)" style="flex:1;min-width:200px">
+          <input type="text" id="newLabel" placeholder="Label (player name)" style="width:180px">
+          <button class="btn btn-success btn-sm" onclick="addHwid()">➕ Add</button>
+        </div>
+        <div id="hwidTable">
+          <table>
+            <thead><tr><th>#</th><th>HWID</th><th>Label</th><th>Added</th><th>Action</th></tr></thead>
+            <tbody id="hwidBody"><tr><td colspan="5" style="text-align:center;color:#666">Loading...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- UPDATE TAB -->
+    <div id="tab-update" class="tab-content">
+      <div class="card">
+        <h2><span class="icon">🚀</span> Push Update</h2>
+        <div class="version-info">
+          <div class="stat"><div class="num" id="statVer">-</div><div class="lbl">Current Version</div></div>
+          <div class="stat"><div class="num" id="statHwids">-</div><div class="lbl">Active HWIDs</div></div>
+          <div class="stat"><div class="num" id="statSize">-</div><div class="lbl">EXE Size</div></div>
+        </div>
+        <div style="margin-top:20px">
+          <div class="input-group">
+            <label>New Version Number</label>
+            <input type="text" id="newVersion" placeholder="e.g., 1.0.1">
+          </div>
+          <div class="input-group">
+            <label>New EXE File</label>
+            <input type="file" id="exeFile" accept=".exe" style="padding:8px">
+          </div>
+          <div class="btn-group">
+            <button class="btn btn-warning" onclick="pushUpdate()">🚀 Push Update to GitHub</button>
+          </div>
+          <p style="font-size:11px;color:#666;margin-top:8px">New EXE select karo → version do → GitHub Release auto create hoga</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- CLIENT TAB -->
+    <div id="tab-client" class="tab-content">
+      <div class="card">
+        <h2><span class="icon">📋</span> Client Setup Command</h2>
+        <p style="margin-bottom:10px;font-size:13px;color:#888">Ye command client ko dena hai (PowerShell Admin me run kare):</p>
+        <div class="setup-cmd" id="setupCmd" onclick="copyCmd(this)">
+          irm 'https://raw.githubusercontent.com/anshkumar258090-alt/streamer-esp-server/main/setup.ps1' | iex
+        </div>
+        <p style="font-size:12px;color:#888;margin-top:8px">CMD version:</p>
+        <div class="setup-cmd" id="setupCmdFull" onclick="copyCmd(this)">
+          powershell -ep bypass -c "irm 'https://raw.githubusercontent.com/anshkumar258090-alt/streamer-esp-server/main/setup.ps1' | iex"
+        </div>
+      </div>
+    </div>
+
+    <!-- TOOLS TAB -->
+    <div id="tab-tools" class="tab-content">
+      <div class="card">
+        <h2><span class="icon">🔧</span> Tools</h2>
+        <div class="btn-group" style="flex-direction:column;gap:12px">
+          <button class="btn btn-primary" onclick="testConnection()" style="width:100%;justify-content:center">🔍 Test GitHub Connection</button>
+          <button class="btn btn-success" onclick="syncConfig()" style="width:100%;justify-content:center">🔄 Re-sync Config to GitHub</button>
+          <button class="btn btn-danger" onclick="if(confirm('ALL HWIDs delete honge! Sure?')){clearAllHwids()}" style="width:100%;justify-content:center">🗑️ Clear All HWIDs</button>
+        </div>
+        <div id="toolOutput" style="margin-top:15px;background:#0a0a1a;padding:12px;border-radius:8px;font-family:monospace;font-size:12px;white-space:pre-wrap;display:none"></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ADD HWID MODAL -->
+<div class="modal-overlay" id="confirmModal">
+  <div class="modal">
+    <h3 id="modalTitle">Confirm</h3>
+    <p id="modalMsg" style="margin-bottom:15px;color:#ccc"></p>
+    <div class="btn-group">
+      <button class="btn btn-primary btn-sm" id="modalConfirmBtn">Confirm</button>
+      <button class="btn btn-sm" style="background:#333" onclick="closeModal()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── STATE ──
+let STATE = { token: '', repo: '', masterKey: '', config: null, configSha: null };
+
+// ── AES CRYPTO (Web Crypto API) ──
+async function deriveKey(passphrase) {
+  const enc = new TextEncoder();
+  const keyMaterial = enc.encode(passphrase);
+  // SHA-256 for key
+  const keyHash = await crypto.subtle.digest('SHA-256', keyMaterial);
+  // MD5 for IV (we'll use a simple implementation)
+  const ivData = enc.encode(passphrase + '_IV');
+  const ivHash = await md5(ivData);
+  const aesKey = await crypto.subtle.importKey('raw', keyHash, { name: 'AES-CBC' }, false, ['encrypt', 'decrypt']);
+  return { key: aesKey, iv: ivHash };
+}
+
+// Simple MD5 implementation for IV derivation
+async function md5(data) {
+  // MD5 is not in Web Crypto, so we implement it
+  const bytes = data instanceof Uint8Array ? data : new TextEncoder().encode(data);
+  let h0=0x67452301,h1=0xEFCDAB89,h2=0x98BADCFE,h3=0x10325476;
+  const K=[0xd76aa478,0xe8c7b756,0x242070db,0xc1bdceee,0xf57c0faf,0x4787c62a,0xa8304613,0xfd469501,0x698098d8,0x8b44f7af,0xffff5bb1,0x895cd7be,0x6b901122,0xfd987193,0xa679438e,0x49b40821,0xf61e2562,0xc040b340,0x265e5a51,0xe9b6c7aa,0xd62f105d,0x02441453,0xd8a1e681,0xe7d3fbc8,0x21e1cde6,0xc33707d6,0xf4d50d87,0x455a14ed,0xa9e3e905,0xfcefa3f8,0x676f02d9,0x8d2a4c8a,0xfffa3942,0x8771f681,0x6d9d6122,0xfde5380c,0xa4beea44,0x4bdecfa9,0xf6bb4b60,0xbebfbc70,0x289b7ec6,0xeaa127fa,0xd4ef3085,0x04881d05,0xd9d4d039,0xe6db99e5,0x1fa27cf8,0xc4ac5665,0xf4292244,0x432aff97,0xab9423a7,0xfc93a039,0x655b59c3,0x8f0ccc92,0xffeff47d,0x85845dd1,0x6fa87e4f,0xfe2ce6e0,0xa3014314,0x4e0811a1,0xf7537e82,0xbd3af235,0x2ad7d2bb,0xeb86d391];
+  const S=[7,12,17,22,7,12,17,22,7,12,17,22,7,12,17,22,5,9,14,20,5,9,14,20,5,9,14,20,5,9,14,20,4,11,16,23,4,11,16,23,4,11,16,23,4,11,16,23,6,10,15,21,6,10,15,21,6,10,15,21,6,10,15,21];
+  const msgLen=bytes.length;const bitLen=msgLen*8;let padded=new Uint8Array(((msgLen+8>>6)+1)*64);padded.set(bytes);padded[msgLen]=0x80;
+  const dv=new DataView(padded.buffer);dv.setUint32(padded.length-8,bitLen&0xFFFFFFFF,true);dv.setUint32(padded.length-4,Math.floor(bitLen/0x100000000),true);
+  for(let off=0;off<padded.length;off+=64){const M=[];for(let j=0;j<16;j++)M[j]=dv.getUint32(off+j*4,true);let a=h0,b=h1,c=h2,d=h3;
+  for(let i=0;i<64;i++){let f,g;if(i<16){f=(b&c)|((~b)&d);g=i}else if(i<32){f=(d&b)|((~d)&c);g=(5*i+1)%16}else if(i<48){f=b^c^d;g=(3*i+5)%16}else{f=c^(b|(~d));g=(7*i)%16}
+  f=f>>>0;const tmp=d;d=c;c=b;const x=(a+f+K[i]+M[g])>>>0;const rot=((x<<S[i])|(x>>>(32-S[i])))>>>0;b=(b+rot)>>>0;a=tmp}
+  h0=(h0+a)>>>0;h1=(h1+b)>>>0;h2=(h2+c)>>>0;h3=(h3+d)>>>0}
+  const result=new Uint8Array(16);const rv=new DataView(result.buffer);rv.setUint32(0,h0,true);rv.setUint32(4,h1,true);rv.setUint32(8,h2,true);rv.setUint32(12,h3,true);
+  return result;
+}
+
+async function encryptConfig(plainText) {
+  const { key, iv } = await deriveKey(STATE.masterKey);
+  const enc = new TextEncoder();
+  const data = enc.encode(plainText);
+  const encrypted = await crypto.subtle.encrypt({ name: 'AES-CBC', iv }, key, data);
+  return btoa(String.fromCharCode(...new Uint8Array(encrypted)));
+}
+
+async function decryptConfig(b64) {
+  const { key, iv } = await deriveKey(STATE.masterKey);
+  const raw = Uint8Array.from(atob(b64.trim()), c => c.charCodeAt(0));
+  const decrypted = await crypto.subtle.decrypt({ name: 'AES-CBC', iv }, key, raw);
+  return new TextDecoder().decode(decrypted);
+}
+
+// ── GITHUB API ──
+async function ghAPI(endpoint, method = 'GET', body = null) {
+  const opts = {
+    method,
+    headers: {
+      'Authorization': `token ${STATE.token}`,
+      'Accept': 'application/vnd.github.v3+json',
+      'Content-Type': 'application/json'
+    }
+  };
+  if (body) opts.body = JSON.stringify(body);
+  const r = await fetch(`https://api.github.com/repos/${STATE.repo}/${endpoint}`, opts);
+  if (!r.ok && method !== 'DELETE') {
+    const err = await r.json().catch(() => ({}));
+    throw new Error(`GitHub API ${r.status}: ${err.message || r.statusText}`);
+  }
+  if (r.status === 204) return {};
+  return r.json();
+}
+
+async function getFileContent(path) {
+  const data = await ghAPI(`contents/${path}?ref=main`);
+  return { content: atob(data.content), sha: data.sha };
+}
+
+async function updateFile(path, content, message, sha = null) {
+  const body = {
+    message,
+    content: btoa(unescape(encodeURIComponent(content))),
+    branch: 'main'
+  };
+  if (sha) body.sha = sha;
+  return ghAPI(`contents/${path}`, 'PUT', body);
+}
+
+// ── TOAST ──
+function toast(msg, type = 'info') {
+  const t = document.createElement('div');
+  t.className = `toast toast-${type}`;
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 3500);
+}
+
+// ── LOGIN ──
+async function doLogin() {
+  const token = document.getElementById('ghToken').value.trim();
+  const repo = document.getElementById('ghRepo').value.trim();
+  const mk = document.getElementById('masterKey').value.trim();
+  if (!token || !repo || !mk) { toast('Sab fields fill karo!', 'error'); return; }
+  
+  STATE.token = token; STATE.repo = repo; STATE.masterKey = mk;
+  
+  try {
+    // Test auth
+    const r = await fetch('https://api.github.com/user', { headers: { 'Authorization': `token ${token}` } });
+    if (!r.ok) throw new Error('Invalid token');
+    const user = await r.json();
+    
+    // Load config
+    await loadConfig();
+    
+    document.getElementById('loginSection').classList.add('hidden');
+    document.getElementById('mainPanel').classList.remove('hidden');
+    document.getElementById('repoName').textContent = repo;
+    
+    // Save to localStorage
+    localStorage.setItem('esp_token', token);
+    localStorage.setItem('esp_repo', repo);
+    localStorage.setItem('esp_mk', mk);
+    
+    toast(`Connected as ${user.login}!`, 'success');
+  } catch (e) {
+    toast(`Login failed: ${e.message}`, 'error');
+  }
+}
+
+async function loadConfig() {
+  try {
+    const { content, sha } = await getFileContent('config.enc');
+    STATE.configSha = sha;
+    const json = await decryptConfig(content.trim());
+    STATE.config = JSON.parse(json);
+    updateUI();
+  } catch (e) {
+    toast(`Config load error: ${e.message}`, 'error');
+    STATE.config = { v: '1.0.0', h: [], u: new Date().toISOString(), hash: '', exe_url: '' };
+  }
+}
+
+function updateUI() {
+  const cfg = STATE.config;
+  document.getElementById('currentVer').textContent = `v${cfg.v}`;
+  document.getElementById('hwidCount').textContent = cfg.h ? cfg.h.length : 0;
+  document.getElementById('lastUpdated').textContent = cfg.u || '-';
+  document.getElementById('statVer').textContent = `v${cfg.v}`;
+  document.getElementById('statHwids').textContent = cfg.h ? cfg.h.length : 0;
+  
+  // HWID table
+  const tbody = document.getElementById('hwidBody');
+  const hwids = cfg.h || [];
+  if (hwids.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#666">No HWIDs registered</td></tr>';
+    return;
+  }
+  tbody.innerHTML = hwids.map((h, i) => {
+    const hwid = typeof h === 'object' ? h.hwid : h;
+    const label = typeof h === 'object' ? (h.label || '-') : '-';
+    const added = typeof h === 'object' ? (h.added || '-') : '-';
+    return `<tr>
+      <td>${i + 1}</td>
+      <td style="font-family:monospace;font-size:12px">${hwid}</td>
+      <td>${label}</td>
+      <td>${added}</td>
+      <td><button class="btn btn-danger btn-sm" onclick="removeHwid(${i})">🗑️</button></td>
+    </tr>`;
+  }).join('');
+}
+
+// ── HWID MANAGEMENT ──
+async function addHwid() {
+  const hwid = document.getElementById('newHwid').value.trim();
+  const label = document.getElementById('newLabel').value.trim() || 'Unknown';
+  if (!hwid) { toast('HWID enter karo!', 'error'); return; }
+  
+  // Check duplicate
+  const exists = (STATE.config.h || []).some(h => (typeof h === 'object' ? h.hwid : h) === hwid);
+  if (exists) { toast('HWID already exists!', 'error'); return; }
+  
+  if (!STATE.config.h) STATE.config.h = [];
+  STATE.config.h.push({ hwid, label, added: new Date().toISOString().split('T')[0] });
+  STATE.config.u = new Date().toLocaleString();
+  
+  await saveConfigToGitHub(`Add HWID: ${label}`);
+  document.getElementById('newHwid').value = '';
+  document.getElementById('newLabel').value = '';
+  updateUI();
+}
+
+async function removeHwid(index) {
+  const h = STATE.config.h[index];
+  const name = typeof h === 'object' ? `${h.hwid} (${h.label})` : h;
+  if (!confirm(`Remove HWID: ${name}?\nClient auto-uninstall hoga 30 min me.`)) return;
+  
+  STATE.config.h.splice(index, 1);
+  STATE.config.u = new Date().toLocaleString();
+  
+  await saveConfigToGitHub(`Remove HWID: ${name}`);
+  updateUI();
+}
+
+async function clearAllHwids() {
+  STATE.config.h = [];
+  STATE.config.u = new Date().toLocaleString();
+  await saveConfigToGitHub('Clear all HWIDs');
+  updateUI();
+}
+
+async function saveConfigToGitHub(message) {
+  try {
+    const json = JSON.stringify(STATE.config);
+    const encrypted = await encryptConfig(json);
+    
+    // Get current SHA
+    try {
+      const { sha } = await getFileContent('config.enc');
+      STATE.configSha = sha;
+    } catch (e) {}
+    
+    await updateFile('config.enc', encrypted, message, STATE.configSha);
+    // Update SHA
+    const { sha: newSha } = await getFileContent('config.enc');
+    STATE.configSha = newSha;
+    
+    toast(`✅ ${message} — Pushed to GitHub!`, 'success');
+  } catch (e) {
+    toast(`❌ Push failed: ${e.message}`, 'error');
+  }
+}
+
+// ── PUSH UPDATE ──
+async function pushUpdate() {
+  const newVer = document.getElementById('newVersion').value.trim();
+  const fileInput = document.getElementById('exeFile');
+  
+  if (!newVer) { toast('Version number do!', 'error'); return; }
+  if (!fileInput.files.length) { toast('EXE file select karo!', 'error'); return; }
+  
+  const file = fileInput.files[0];
+  if (!confirm(`Push update v${newVer}?\nFile: ${file.name} (${(file.size/1024/1024).toFixed(2)} MB)`)) return;
+  
+  try {
+    toast('Uploading... please wait', 'info');
+    
+    // Calculate SHA256
+    const arrayBuf = await file.arrayBuffer();
+    const hashBuf = await crypto.subtle.digest('SHA-256', arrayBuf);
+    const hashArr = Array.from(new Uint8Array(hashBuf));
+    const hash = hashArr.map(b => b.toString(16).padStart(2, '0')).join('').toUpperCase();
+    
+    // Delete existing release if any
+    try {
+      await ghAPI(`releases/tags/v${newVer}`, 'DELETE');
+      await new Promise(r => setTimeout(r, 1000));
+    } catch (e) {}
+    
+    // Delete tag
+    try { await ghAPI(`git/refs/tags/v${newVer}`, 'DELETE'); } catch (e) {}
+    await new Promise(r => setTimeout(r, 1000));
+    
+    // Create release
+    const release = await ghAPI('releases', 'POST', {
+      tag_name: `v${newVer}`,
+      name: `v${newVer}`,
+      body: `StreamerESP v${newVer}`,
+      draft: false,
+      prerelease: false
+    });
+    
+    // Upload asset
+    const uploadUrl = release.upload_url.replace('{?name,label}', `?name=WindowsSecurityHealth.exe`);
+    await fetch(uploadUrl, {
+      method: 'POST',
+      headers: {
+        'Authorization': `token ${STATE.token}`,
+        'Content-Type': 'application/octet-stream'
+      },
+      body: arrayBuf
+    });
+    
+    // Update config
+    const exeUrl = `https://github.com/${STATE.repo}/releases/download/v${newVer}/WindowsSecurityHealth.exe`;
+    STATE.config.v = newVer;
+    STATE.config.hash = hash;
+    STATE.config.exe_url = exeUrl;
+    STATE.config.u = new Date().toLocaleString();
+    
+    await saveConfigToGitHub(`Update to v${newVer}`);
+    updateUI();
+    document.getElementById('statSize').textContent = `${(file.size/1024/1024).toFixed(1)} MB`;
+    
+    toast(`✅ v${newVer} pushed! Clients update in 30 min`, 'success');
+  } catch (e) {
+    toast(`❌ Update failed: ${e.message}`, 'error');
+  }
+}
+
+// ── TOOLS ──
+async function testConnection() {
+  const out = document.getElementById('toolOutput');
+  out.style.display = 'block';
+  out.textContent = 'Testing...\n';
+  
+  try {
+    // Test API
+    const user = await (await fetch('https://api.github.com/user', { headers: { 'Authorization': `token ${STATE.token}` } })).json();
+    out.textContent += `✅ GitHub Auth: ${user.login}\n`;
+    
+    // Test repo
+    const repo = await ghAPI('');
+    out.textContent += `✅ Repo: ${repo.full_name} (${repo.visibility})\n`;
+    
+    // Test config
+    const { content } = await getFileContent('config.enc');
+    const json = await decryptConfig(content.trim());
+    const cfg = JSON.parse(json);
+    out.textContent += `✅ Config: v${cfg.v}, ${(cfg.h||[]).length} HWIDs\n`;
+    
+    // Test releases
+    const releases = await ghAPI('releases?per_page=1');
+    if (releases.length) {
+      out.textContent += `✅ Latest Release: ${releases[0].tag_name}\n`;
+    }
+    
+    out.textContent += '\n🎉 All checks passed!';
+    toast('All tests passed!', 'success');
+  } catch (e) {
+    out.textContent += `\n❌ Error: ${e.message}`;
+    toast('Test failed!', 'error');
+  }
+}
+
+async function syncConfig() {
+  await saveConfigToGitHub('Manual sync');
+}
+
+// ── TABS ──
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  document.querySelector(`[onclick="switchTab('${name}')"]`).classList.add('active');
+  document.getElementById(`tab-${name}`).classList.add('active');
+}
+
+// ── COPY CMD ──
+function copyCmd(el) {
+  navigator.clipboard.writeText(el.textContent.trim());
+  toast('📋 Copied to clipboard!', 'success');
+}
+
+// ── MODAL ──
+function closeModal() { document.getElementById('confirmModal').style.display = 'none'; }
+
+// ── AUTO-LOGIN FROM LOCALSTORAGE ──
+window.addEventListener('load', () => {
+  const t = localStorage.getItem('esp_token');
+  const r = localStorage.getItem('esp_repo');
+  const m = localStorage.getItem('esp_mk');
+  if (t && r && m) {
+    document.getElementById('ghToken').value = t;
+    document.getElementById('ghRepo').value = r;
+    document.getElementById('masterKey').value = m;
+  }
+});
+</script>
+
+</body>
+</html>
