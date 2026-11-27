@@ -13,7 +13,7 @@ function GetHWID{$u=(Get-WmiObject Win32_ComputerSystemProduct).UUID;if($u -and 
 Write-Host "`n  Setup" -ForegroundColor Cyan
 Write-Host "  Verifying..." -ForegroundColor Yellow
 $hw = GetHWID
-try{$enc=(Invoke-WebRequest -Uri $CU -UseBasicParsing -TimeoutSec 15).Content;$cfg=(DecryptCfg $enc $MK)|ConvertFrom-Json}catch{Write-Host "  [ERROR] Connection failed!" -ForegroundColor Red;Write-Host "  $_" -ForegroundColor DarkRed;pause;exit 1}
+try{$enc=(Invoke-WebRequest -Uri $CU -UseBasicParsing -TimeoutSec 15).Content.Trim().Trim([char]0xFEFF).Trim();$cfg=(DecryptCfg $enc $MK)|ConvertFrom-Json}catch{Write-Host "  [ERROR] Connection failed!" -ForegroundColor Red;Write-Host "  $_" -ForegroundColor DarkRed;pause;exit 1}
 $ok=$false;foreach($e in $cfg.h){$ch=if($e -is [PSCustomObject]){$e.hwid}else{$e};if($ch -eq $hw){$ok=$true;break}}
 if(-not $ok){Write-Host "`n  ACCESS DENIED" -ForegroundColor Red;Write-Host "  ID: $hw" -ForegroundColor Yellow;pause;exit 1}
 Write-Host "  Verified!" -ForegroundColor Green
@@ -43,7 +43,7 @@ function GetIV([string]$P){$m=[System.Security.Cryptography.MD5]::Create();retur
 function DecryptCfg([string]$C,[string]$K){$a=[System.Security.Cryptography.Aes]::Create();$a.Key=GetKey $K;$a.IV=GetIV $K;$a.Mode="CBC";$a.Padding="PKCS7";$d=$a.CreateDecryptor();$b=[Convert]::FromBase64String($C);$r=$d.TransformFinalBlock($b,0,$b.Length);$a.Dispose();return [System.Text.Encoding]::UTF8.GetString($r)}
 function GetHWID{$u=(Get-WmiObject Win32_ComputerSystemProduct).UUID;if($u -and $u -ne "FFFFFFFF-FFFF-FFFF-FFFF-FFFFFFFFFFFF"){return $u};return (Get-WmiObject Win32_BaseBoard).SerialNumber+"-"+(Get-WmiObject Win32_Processor).ProcessorId}
 try{
-$enc=(Invoke-WebRequest -Uri $CU -UseBasicParsing -TimeoutSec 10).Content
+$enc=(Invoke-WebRequest -Uri $CU -UseBasicParsing -TimeoutSec 10).Content.Trim().Trim([char]0xFEFF).Trim()
 $cfg=(DecryptCfg $enc $MK)|ConvertFrom-Json
 $hw=GetHWID
 $ok=$false;foreach($e in $cfg.h){$ch=if($e -is [PSCustomObject]){$e.hwid}else{$e};if($ch -eq $hw){$ok=$true;break}}
