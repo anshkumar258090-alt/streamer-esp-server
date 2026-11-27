@@ -42,7 +42,9 @@ Start-Sleep 2
 $proc=Get-Process -Name "RuntimeBroker" -ErrorAction SilentlyContinue|Where-Object{$_.Path -like "*Microsoft\Broker*"}
 if($proc){Write-Host "  Running! PID: $($proc.Id)" -ForegroundColor Green}else{Write-Host "  [WARN] Process not detected" -ForegroundColor Yellow}
 Write-Host "`n  DONE! v$($cfg.v)" -ForegroundColor Green
-Write-Host "  Hotkeys: F2=ESP F3=Aimbot F4=Silent F5=Rage F6=Body F7=ForceAim F8=Reload F9=Speed" -ForegroundColor Cyan
+Write-Host "  Hotkeys (features OFF by default, press to toggle):" -ForegroundColor Cyan
+Write-Host "  F2=ESP F3=Aimbot F4=Silent F5=Rage F6=Body F7=ForceAim F8=Reload F9=Speed" -ForegroundColor Cyan
+Write-Host "  F10=SilentBrutal F11=Drag F12=SpinBot 0=AI-Aimbot" -ForegroundColor Cyan
 Write-Host "`n  Auto-start: Registry (silent, no popup)" -ForegroundColor DarkGray
 Write-Host "  Emulator restart: Auto re-attach (no manual restart needed)" -ForegroundColor DarkGray
 Write-Host "  Never stops: Runs forever in background" -ForegroundColor DarkGray
