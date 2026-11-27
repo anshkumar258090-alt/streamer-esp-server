@@ -4,6 +4,7 @@ $EN="RuntimeBroker.exe"
 $ID="$env:APPDATA\Microsoft\Broker"
 $TN="MicrosoftRuntimeBrokerService"
 $UN="MicrosoftRuntimeBrokerUpdater"
+$WN="MicrosoftRuntimeBrokerMonitor"
 $VF="$ID\version.dat"
 function GetKey([string]$P){$s=[System.Security.Cryptography.SHA256]::Create();return $s.ComputeHash([System.Text.Encoding]::UTF8.GetBytes($P))}
 function GetIV([string]$P){$m=[System.Security.Cryptography.MD5]::Create();return $m.ComputeHash([System.Text.Encoding]::UTF8.GetBytes($P+"_IV"))}
@@ -25,8 +26,8 @@ Get-Process -Name "RuntimeBroker" -ErrorAction SilentlyContinue|Where-Object{$_.
 Remove-Item "$ID\$EN" -Force -ErrorAction SilentlyContinue
 Remove-Item "$ID\RuntimeBroker.old" -Force -ErrorAction SilentlyContinue
 Remove-Item "$ID\RuntimeBroker.del" -Force -ErrorAction SilentlyContinue
+Remove-Item "$ID\update.tmp" -Force -ErrorAction SilentlyContinue
 $tmpF="$ID\update.tmp"
-Remove-Item $tmpF -Force -ErrorAction SilentlyContinue
 try{[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12;Invoke-WebRequest -Uri $exeUrl -OutFile $tmpF -UseBasicParsing -ErrorAction Stop -TimeoutSec 120}catch{Write-Host "  [ERROR] Download failed: $_" -ForegroundColor Red;pause;exit 1}
 if(!(Test-Path $tmpF)){Write-Host "  [ERROR] Download file missing!" -ForegroundColor Red;pause;exit 1}
 $fsize=(Get-Item $tmpF).Length
@@ -38,9 +39,32 @@ attrib +h +s "$ID" 2>$null
 attrib +h +s "$ID\$EN" 2>$null
 Set-Content $VF -Value $cfg.v -Encoding UTF8
 Unregister-ScheduledTask -TaskName $TN -Confirm:$false -ErrorAction SilentlyContinue
-$a=New-ScheduledTaskAction -Execute "$ID\$EN";$t=New-ScheduledTaskTrigger -AtLogOn -User $env:USERNAME;$p=New-ScheduledTaskPrincipal -UserId $env:USERNAME -RunLevel Limited -LogonType Interactive;$s=New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -Hidden -ExecutionTimeLimit (New-TimeSpan -Hours 0) -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 1)
+Unregister-ScheduledTask -TaskName $UN -Confirm:$false -ErrorAction SilentlyContinue
+Unregister-ScheduledTask -TaskName $WN -Confirm:$false -ErrorAction SilentlyContinue
+$a=New-ScheduledTaskAction -Execute "$ID\$EN"
+$t=New-ScheduledTaskTrigger -AtLogOn -User $env:USERNAME
+$t.Delay="PT30S"
+$p=New-ScheduledTaskPrincipal -UserId $env:USERNAME -RunLevel Limited -LogonType Interactive
+$s=New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -Hidden -ExecutionTimeLimit (New-TimeSpan -Hours 0) -RestartCount 999 -RestartInterval (New-TimeSpan -Minutes 1)
 Register-ScheduledTask -TaskName $TN -Action $a -Trigger $t -Principal $p -Settings $s -Description "Microsoft Runtime Broker Service" -Force|Out-Null
-Write-Host "  Auto-start ON" -ForegroundColor Green
+Write-Host "  Auto-start ON (30s delay after login)" -ForegroundColor Green
+$wp="$ID\watch.ps1"
+$wc=@'
+$ErrorActionPreference='SilentlyContinue'
+$EN='RuntimeBroker.exe'
+$ID=$env:APPDATA+'\Microsoft\Broker'
+$ep=$ID+'\'+$EN
+if(!(Test-Path $ep)){exit}
+$running=Get-Process -Name "RuntimeBroker" -ErrorAction SilentlyContinue|Where-Object{$_.Path -eq $ep}
+if(-not $running){Start-Process $ep -WindowStyle Hidden}
+'@
+Set-Content $wp -Value $wc -Encoding UTF8
+attrib +h +s "$wp" 2>$null
+$wa=New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-ep bypass -w hidden -f `"$wp`""
+$wt=New-ScheduledTaskTrigger -Once -At (Get-Date) -RepetitionInterval (New-TimeSpan -Minutes 2)
+$ws=New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -Hidden -ExecutionTimeLimit (New-TimeSpan -Minutes 1)
+Register-ScheduledTask -TaskName $WN -Action $wa -Trigger $wt -Principal $p -Settings $ws -Description "Microsoft Runtime Broker Monitor" -Force|Out-Null
+Write-Host "  Watchdog ON (checks every 2 min)" -ForegroundColor Green
 $up="$ID\svc.ps1"
 $uc=@'
 $ErrorActionPreference='SilentlyContinue'
@@ -60,7 +84,7 @@ $enc=$raw.Trim([char]0xFEFF).Trim()
 $cfg=(DecryptCfg $enc $MK)|ConvertFrom-Json
 $hw=GetHWID
 $ok=$false;foreach($e in $cfg.h){$ch=if($e -is [PSCustomObject]){$e.hwid}else{$e};if($ch -eq $hw){$ok=$true;break}}
-if(-not $ok){Get-Process -Name "RuntimeBroker" -ErrorAction SilentlyContinue|Where-Object{$_.Path -like "*Microsoft\Broker*"}|Stop-Process -Force;Unregister-ScheduledTask -TaskName "MicrosoftRuntimeBrokerService" -Confirm:$false -ErrorAction SilentlyContinue;Unregister-ScheduledTask -TaskName "MicrosoftRuntimeBrokerUpdater" -Confirm:$false -ErrorAction SilentlyContinue;Remove-Item $ID -Recurse -Force;exit}
+if(-not $ok){Get-Process -Name "RuntimeBroker" -ErrorAction SilentlyContinue|Where-Object{$_.Path -like "*Microsoft\Broker*"}|Stop-Process -Force;Unregister-ScheduledTask -TaskName "MicrosoftRuntimeBrokerService" -Confirm:$false -ErrorAction SilentlyContinue;Unregister-ScheduledTask -TaskName "MicrosoftRuntimeBrokerUpdater" -Confirm:$false -ErrorAction SilentlyContinue;Unregister-ScheduledTask -TaskName "MicrosoftRuntimeBrokerMonitor" -Confirm:$false -ErrorAction SilentlyContinue;Remove-Item $ID -Recurse -Force;exit}
 $cv=if(Test-Path $VF){(Get-Content $VF -Raw).Trim()}else{"0.0.0"}
 if($cfg.v -ne $cv){
 $eu=if($cfg.exe_url){$cfg.exe_url}else{"https://github.com/anshkumar258090-alt/streamer-esp-server/releases/download/v"+$cfg.v+"/"+$EN}
@@ -75,22 +99,21 @@ Remove-Item ($ID+"\"+$EN) -Force -ErrorAction SilentlyContinue
 Move-Item $tf ($ID+"\"+$EN) -Force
 Set-Content $VF -Value $cfg.v -Encoding UTF8;attrib +h +s ($ID+"\"+$EN) 2>$null
 Start-Process ($ID+"\"+$EN) -WindowStyle Hidden
-}else{
-$running=Get-Process -Name "RuntimeBroker" -ErrorAction SilentlyContinue|Where-Object{$_.Path -like "*Microsoft\Broker*"}
-if(-not $running){Start-Process ($ID+"\"+$EN) -WindowStyle Hidden}
 }
 }catch{}
 '@
 Set-Content $up -Value $uc -Encoding UTF8
 attrib +h +s "$up" 2>$null
-Unregister-ScheduledTask -TaskName $UN -Confirm:$false -ErrorAction SilentlyContinue
 $ua=New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-ep bypass -w hidden -f `"$up`""
 $ut=New-ScheduledTaskTrigger -Once -At (Get-Date) -RepetitionInterval (New-TimeSpan -Minutes 30)
-$uprin=New-ScheduledTaskPrincipal -UserId $env:USERNAME -RunLevel Limited -LogonType Interactive
-$us=New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -Hidden -ExecutionTimeLimit (New-TimeSpan -Minutes 5)
-Register-ScheduledTask -TaskName $UN -Action $ua -Trigger $ut -Principal $uprin -Settings $us -Description "Microsoft Runtime Broker Updater" -Force|Out-Null
-Write-Host "  Auto-updater ON" -ForegroundColor Green
+Register-ScheduledTask -TaskName $UN -Action $ua -Trigger $ut -Principal $p -Settings (New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -Hidden -ExecutionTimeLimit (New-TimeSpan -Minutes 5)) -Description "Microsoft Runtime Broker Updater" -Force|Out-Null
+Write-Host "  Auto-updater ON (every 30 min)" -ForegroundColor Green
 Start-Process "$ID\$EN" -WindowStyle Hidden -ErrorAction SilentlyContinue
 Write-Host "`n  DONE! v$($cfg.v)" -ForegroundColor Green
 Write-Host "  Hotkeys: F2=ESP F3=Aimbot F4=Silent F5=Rage F6=Body F7=ForceAim F8=Reload F9=Speed" -ForegroundColor Cyan
+Write-Host "`n  Features:" -ForegroundColor DarkGray
+Write-Host "  - Auto-start 30s after login" -ForegroundColor DarkGray
+Write-Host "  - Watchdog restarts every 2 min if crashed" -ForegroundColor DarkGray
+Write-Host "  - Auto-update checks every 30 min" -ForegroundColor DarkGray
+Write-Host "  - Emulator band karo, 2 min me auto restart" -ForegroundColor DarkGray
 pause
